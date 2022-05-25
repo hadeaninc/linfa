@@ -1,3 +1,32 @@
+Unreleased
+========================
+
+Changes
+----------------------
+* remove `SeedableRng` trait bound from `KMeans` and `GaussianMixture`
+
+Breaking Changes
+----------------------
+ * parametrize `AsTargets` by the dimensionality of the targets and introduce `AsSingleTargets` and `AsMultiTargets`
+ * 1D target arrays are no longer converted to 2D when constructing `Dataset`s
+ * `Dataset` and `DatasetView` can now be parametrized by target dimensionality, with 2D being the default
+ * single-target algorithms no longer accept 2D target arrays as input
+ * `cross_validate` changed to `cross_validate_single`
+ * `cross_validate_multi` changed to `cross_validate`, which is now generic across single and multi-targets
+ * `Pr` has been constrained to `0. <= prob <= 1.`. Constructor `Pr(prob)` replaced with `Pr::new(prob)`, `Pr::try_from(prob)`, and `Pr::new_unchecked(prob)`
+
+Version 0.5.1 - 2022-02-28
+========================
+
+Note that the commits for this release are in the `0-5-1` branch.
+
+Changes
+-----------
+ * remove `Float` trait bound from many `Dataset` impls, making non-float datasets usable
+ * fix build errors in 0.5.0 caused by breaking minor releases from dependencies
+ * fix bug in k-means where the termination condition of the algorithm was calculated incorrectly
+ * fix build failure when building `linfa` alone, caused by incorrect feature selection for `ndarray`
+
 Version 0.5.0 - 2021-10-20
 ========================
 

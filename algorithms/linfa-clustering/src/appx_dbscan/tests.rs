@@ -1,16 +1,16 @@
-use crate::{generate_blobs_with_distribution, AppxDbscan};
-use crate::{AppxDbscanParamsError, Dbscan};
+use crate::{AppxDbscan, AppxDbscanParamsError, Dbscan};
 use linfa::traits::Transformer;
 use linfa::ParamGuard;
+use linfa_datasets::generate;
 use ndarray::{arr1, arr2, concatenate, s, Array1, Array2};
 use ndarray_rand::rand::SeedableRng;
 use ndarray_rand::rand_distr::Uniform;
-use rand_isaac::Isaac64Rng;
+use rand_xoshiro::Xoshiro256Plus;
 use std::collections::HashMap;
 
 #[test]
 fn appx_dbscan_parity() {
-    let mut rng = Isaac64Rng::seed_from_u64(40);
+    let mut rng = Xoshiro256Plus::seed_from_u64(40);
     let min_points = 4;
     let tolerance = 0.8;
     let centroids = arr2(&[
@@ -25,7 +25,7 @@ fn appx_dbscan_parity() {
     // Each cluster of 100 points is situated within a 2x2x2 cube. On average the points are 0.08
     // units apart, so they should all be in the same cluster
     let clusters =
-        generate_blobs_with_distribution(100, &centroids, Uniform::new(-1., 1.), &mut rng);
+        generate::blobs_with_distribution(100, &centroids, Uniform::new(-1., 1.), &mut rng);
     let dataset = concatenate![ndarray::Axis(0), clusters, outliers];
 
     let appx_res = AppxDbscan::params(min_points)
