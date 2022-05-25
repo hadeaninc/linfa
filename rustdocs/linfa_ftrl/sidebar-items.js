@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["FtrlError",""]],"struct":[["Ftrl",""],["FtrlParams",""]],"type":[["Result","Simplified `Result` using `FTRLError` as error type"]]});
