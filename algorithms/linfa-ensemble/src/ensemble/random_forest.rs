@@ -43,7 +43,7 @@ pub fn rf_test() {
     let ranked_predictions_ensemble = model.aggregate_predictions(predictions_ensemble);
 
     //println!("Predictions: \n{:?}", predictions_ensemble);
-    println!("Ranked Predictions: \n{:?}", ranked_predictions_ensemble);
+    println!("Ranked Predictions: \n{:?}", ranked_predictions_ensemble.collect::<Vec<_>>());
 
     let mut y_array: Array2<usize> = model.default_target(&dataset.records);
 

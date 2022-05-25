@@ -28,7 +28,7 @@ impl<M> EnsembleLearner<M> {
     // Consumes prediction iterator to return all predictions made by any model
     // Orders predictions by total number of models giving that prediciton
     pub fn aggregate_predictions<Ys: Iterator>(&self, ys: Ys)
-    -> Array1<Vec<(Array1<<Ys::Item as AsTargets>::Elem>, usize)>>
+    -> impl Iterator<Item = Vec<(Array1<<Ys::Item as AsTargets>::Elem>, usize)>>
     where
         Ys::Item: AsMultiTargets,
         <Ys::Item as AsTargets>::Elem: Copy + Eq + Hash,
@@ -49,16 +49,11 @@ impl<M> EnsembleLearner<M> {
             }
         }
 
-        let mut prediction_array = Array1::from_elem(prediction_maps.len(), Vec::new());
-
-        for i in 0..prediction_maps.len() {
-            //I think these need to copy data again and would also be nicer if they contained a view?
-            prediction_array[i] = prediction_maps[i].to_owned().into_iter().collect();
-            prediction_array[i].sort_by(|(_, a), (_, b)| b.cmp(a))
-
-        }
-
-        prediction_array
+        prediction_maps.into_iter().map(|xs| {
+            let mut xs: Vec<_> = xs.into_iter().collect();
+            xs.sort_by(|(_, x), (_, y)| x.cmp(y));
+            xs
+        })
     }
 }
 
