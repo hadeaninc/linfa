@@ -1,5 +1,5 @@
 use linfa::{
-    dataset::{AsTargets, AsTargetsMut, FromTargetArrayOwned, Records},
+    dataset::{AsTargets, AsMultiTargets, AsMultiTargetsMut, FromTargetArrayOwned, Records},
     error::{Error},
     traits::*,
     DatasetBase,
@@ -22,10 +22,7 @@ pub struct EnsembleLearner<M> {
 impl<M> EnsembleLearner<M> {
     pub fn generate_predictions<'b, R: Records, T>(&'b self, x: &'b R) -> impl Iterator<Item = T> + 'b
     where M: Predict<&'b R, T> + PredictInplace<R, T> {
-        self.models.iter().map(move |m| {
-            let result = m.predict(x);
-            result
-        })
+        self.models.iter().map(move |m| m.predict(x))
     }
 
     // Consumes prediction iterator to return all predictions made by any model
@@ -33,7 +30,7 @@ impl<M> EnsembleLearner<M> {
     pub fn aggregate_predictions<Ys: Iterator>(&self, ys: Ys)
     -> Array1<Vec<(Array1<<Ys::Item as AsTargets>::Elem>, usize)>>
     where
-        Ys::Item: AsTargets,
+        Ys::Item: AsMultiTargets,
         <Ys::Item as AsTargets>::Elem: Copy + Eq + Hash,
     {
         let mut prediction_maps = Vec::new();
@@ -70,7 +67,7 @@ PredictInplace<Array2<F>, T> for EnsembleLearner<M>
 where
     M: PredictInplace<Array2<F>, T>,
     <T as AsTargets>::Elem: Copy + Eq + Hash,
-    T: AsTargets + AsTargetsMut<Elem = <T as AsTargets>::Elem>,
+    T: AsMultiTargets + AsMultiTargetsMut<Elem = <T as AsTargets>::Elem>,
 {
     fn predict_inplace(&self, x: &Array2<F>, y: &mut T) {
         let mut y_array = y.as_multi_targets_mut();
@@ -131,8 +128,8 @@ impl<D, T, P: Fit<Array2<D::Elem>, T::Owned, Error>>
 where
     D: Data,
     D::Elem: Clone,
-    T: AsTargets + FromTargetArrayOwned<<T as AsTargets>::Elem>,
-    <T as AsTargets>::Elem: Copy + Eq + Hash,
+    T: FromTargetArrayOwned,
+    T::Elem: Copy + Eq + Hash,
     T::Owned: AsTargets,
 {
     type Object = EnsembleLearner<P::Object>;
