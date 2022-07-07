@@ -4,13 +4,13 @@
 //! functionality.
 use ndarray::{
     Array, Array1, ArrayBase, ArrayView, ArrayView1, ArrayView2, ArrayViewMut, ArrayViewMut1,
-    ArrayViewMut2, CowArray, Ix1, Ix2, Ix3, OwnedRepr, RemoveAxis, ScalarOperand,
+    ArrayViewMut2, CowArray, Ix1, Ix2, Ix3, NdFloat, OwnedRepr, RemoveAxis, ScalarOperand,
 };
 
 #[cfg(feature = "ndarray-linalg")]
 use ndarray_linalg::{Lapack, Scalar};
 
-use num_traits::{AsPrimitive, FromPrimitive, NumAssignOps, NumCast, Signed};
+use num_traits::{AsPrimitive, FromPrimitive, NumCast, Signed};
 use rand::distributions::uniform::SampleUniform;
 
 use std::cmp::{Ordering, PartialOrd};
@@ -38,17 +38,11 @@ pub use lapack_bounds::*;
 /// implement them for 32bit and 64bit floating points. They are used in records of a dataset and, for
 /// regression task, in the targets as well.
 pub trait Float:
-    FromPrimitive
-    + num_traits::Float
-    + PartialOrd
-    + Sync
-    + Send
+    NdFloat
+    + FromPrimitive
     + Default
-    + fmt::Display
-    + fmt::Debug
     + Signed
     + Sum
-    + NumAssignOps
     + AsPrimitive<usize>
     + for<'a> AddAssign<&'a Self>
     + for<'a> MulAssign<&'a Self>
@@ -58,6 +52,7 @@ pub trait Float:
     + SampleUniform
     + ScalarOperand
     + approx::AbsDiffEq
+    + std::marker::Unpin
 {
     #[cfg(feature = "ndarray-linalg")]
     type Lapack: Float + Scalar + Lapack;
@@ -175,6 +170,7 @@ impl Deref for Pr {
 /// * `R: Records`: generic over feature matrices or kernel matrices
 /// * `T`: generic over any `ndarray` matrix which can be used as targets. The `AsTargets` trait
 /// bound is omitted here to avoid some repetition in implementation `src/dataset/impl_dataset.rs`
+#[derive(Debug, Clone, PartialEq)]
 pub struct DatasetBase<R, T>
 where
     R: Records,
@@ -196,6 +192,7 @@ where
 ///
 /// * `targets`: wrapped target field
 /// * `labels`: counted labels with label-count association
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CountedTargets<L: Label, P> {
     targets: P,
     labels: Vec<HashMap<L, usize>>,

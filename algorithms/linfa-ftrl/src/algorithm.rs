@@ -7,7 +7,7 @@ use linfa::{DatasetBase, Float};
 use ndarray::{Array1, ArrayBase, ArrayView1, Data, Ix2, Zip};
 use rand::Rng;
 
-/// Simplified `Result` using [`FTRLError`](crate::FTRLError) as error type
+/// Simplified `Result` using [`FtrlError`](crate::FtrlError) as error type
 pub type Result<T> = std::result::Result<T, FtrlError>;
 
 impl<'a, F, R, D, T> FitWith<'a, ArrayBase<D, Ix2>, T, FtrlError> for FtrlValidParams<F, R>
@@ -221,6 +221,15 @@ mod test {
     use ndarray::array;
     use rand::rngs::SmallRng;
     use rand::SeedableRng;
+
+    #[test]
+    fn autotraits() {
+        fn has_autotraits<T: Send + Sync + Sized + Unpin>() {}
+        has_autotraits::<FtrlParams<f64, rand_xoshiro::Xoshiro256Plus>>();
+        has_autotraits::<FtrlValidParams<f64, rand_xoshiro::Xoshiro256Plus>>();
+        has_autotraits::<Ftrl<f64>>();
+        has_autotraits::<FtrlError>();
+    }
 
     #[test]
     fn sigmoid_works() {

@@ -5,7 +5,10 @@ use linfa::{
     traits::*,
     Float,
 };
+#[cfg(not(feature = "blas"))]
+use linfa_linalg::{eigh::*, svd::*};
 use ndarray::{Array, Array1, Array2, ArrayBase, Axis, Data, Ix2};
+#[cfg(feature = "blas")]
 use ndarray_linalg::{eigh::Eigh, solveh::UPLO, svd::SVD};
 use ndarray_rand::{rand::SeedableRng, rand_distr::Uniform, RandomExt};
 use ndarray_stats::QuantileExt;
@@ -25,7 +28,7 @@ impl<F: Float, D: Data<Elem = F>, T> Fit<ArrayBase<D, Ix2>, T, FastIcaError>
     ///
     /// # Errors
     ///
-    /// If the [`FastIca::ncomponents`] is set to a number greater than the minimum of
+    /// If the [`FastIcaValidParams::ncomponents`] is set to a number greater than the minimum of
     /// the number of rows and columns
     ///
     /// If the `alpha` value set for [`GFunc::Logcosh`] is not between 1 and 2
@@ -66,6 +69,9 @@ impl<F: Float, D: Data<Elem = F>, T> Fit<ArrayBase<D, Ix2>, T, FastIcaError>
         let k = match xcentered.svd(true, false)? {
             (Some(u), s, _) => {
                 let s = s.mapv(F::Lapack::cast);
+                // This slice operation will extract the "thin" SVD component of `u` regardless of
+                // whether `.svd` returns a full or thin SVD, because the slice dimensions
+                // correspond to the thin SVD dimensions.
                 (u.slice_move(s![.., ..nsamples.min(nfeatures)]) / s)
                     .t()
                     .slice(s![..ncomponents, ..])
@@ -145,7 +151,10 @@ impl<F: Float> FastIcaValidParams<F> {
     //
     // W <- (W * W.T)^{-1/2} * W
     fn sym_decorrelation(w: &Array2<F>) -> Result<Array2<F>> {
+        #[cfg(feature = "blas")]
         let (eig_val, eig_vec) = w.dot(&w.t()).with_lapack().eigh(UPLO::Upper)?;
+        #[cfg(not(feature = "blas"))]
+        let (eig_val, eig_vec) = w.dot(&w.t()).with_lapack().eigh()?;
         let eig_val = eig_val.mapv(F::cast);
         let eig_vec = eig_vec.without_lapack();
 
@@ -170,7 +179,7 @@ impl<F: Float> FastIcaValidParams<F> {
     derive(Serialize, Deserialize),
     serde(crate = "serde_crate")
 )]
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FastIca<F> {
     mean: Array1<F>,
     components: Array2<F>,
@@ -200,7 +209,7 @@ impl<F: Float> PredictInplace<Array2<F>, Array2<F>> for FastIca<F> {
     derive(Serialize, Deserialize),
     serde(crate = "serde_crate")
 )]
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum GFunc {
     Logcosh(f64),
     Exp,
@@ -261,7 +270,18 @@ mod tests {
     use super::*;
     use linfa::traits::{Fit, Predict};
 
+    use crate::hyperparams::{FastIcaParams, FastIcaValidParams};
     use ndarray_rand::rand_distr::StudentT;
+
+    #[test]
+    fn autotraits() {
+        fn has_autotraits<T: Send + Sync + Sized + Unpin>() {}
+        has_autotraits::<FastIca<f64>>();
+        has_autotraits::<GFunc>();
+        has_autotraits::<FastIcaParams<f64>>();
+        has_autotraits::<FastIcaValidParams<f64>>();
+        has_autotraits::<FastIcaError>();
+    }
 
     // Test to make sure the number of components set cannot be greater
     // that the minimum of the number of rows and columns of the input
