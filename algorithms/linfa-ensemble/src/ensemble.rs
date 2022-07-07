@@ -1,12 +1,11 @@
 use linfa::{
-    dataset::{AsTargets, AsMultiTargets, AsMultiTargetsMut, FromTargetArrayOwned, Records},
+    dataset::{AsTargets, AsTargetsMut, FromTargetArrayOwned, Records},
     error::{Error},
     traits::*,
     DatasetBase,
 };
 use ndarray::{
-    Array1, Array2, ArrayBase, Axis,
-    Data, Ix2,
+    Array2, Axis, Array, Dimension
 };
 use std::{
     cmp::Eq,
@@ -14,44 +13,43 @@ use std::{
     hash::Hash,
 };
 
-// Add a wrapper function for getting stats out of predictors
 pub struct EnsembleLearner<M> {
     pub models: Vec<M>,
 }
 
 impl<M> EnsembleLearner<M> {
+
+    // Generates prediction iterator returning predictions from each model
     pub fn generate_predictions<'b, R: Records, T>(&'b self, x: &'b R) -> impl Iterator<Item = T> + 'b
     where M: Predict<&'b R, T> + PredictInplace<R, T> {
         self.models.iter().map(move |m| m.predict(x))
     }
 
-    // Consumes prediction iterator to return all predictions made by any model
+    // Consumes prediction iterator to return all predictions
     // Orders predictions by total number of models giving that prediciton
     pub fn aggregate_predictions<Ys: Iterator>(&self, ys: Ys)
-    -> impl Iterator<Item = Vec<(Array1<<Ys::Item as AsTargets>::Elem>, usize)>>
+    -> impl Iterator<Item = Vec<(Array<<Ys::Item as AsTargets>::Elem, <<Ys::Item as AsTargets>::Ix as Dimension>::Smaller >, usize)>>
     where
-        Ys::Item: AsMultiTargets,
+        Ys::Item: AsTargets,
         <Ys::Item as AsTargets>::Elem: Copy + Eq + Hash,
     {
         let mut prediction_maps = Vec::new();
 
         for y in ys {
-            let targets = y.as_multi_targets();
+            let targets = y.as_targets();
             let no_targets = targets.shape()[0];
 
             for i in 0..no_targets {
                 if prediction_maps.len() == i {
-                    prediction_maps.push(HashMap::new())
+                    prediction_maps.push(HashMap::new());
                 }
-                //Still need to take ownership here to get data out of view
-                //Might be better to store all predictions elsewhere and return a view on them here?
-                *prediction_maps[i].entry(y.as_multi_targets().index_axis(Axis(0), i).to_owned()).or_insert(0) += 1;
+                *prediction_maps[i].entry(y.as_targets().index_axis(Axis(0), i).to_owned()).or_insert(0) += 1;
             }
         }
 
         prediction_maps.into_iter().map(|xs| {
             let mut xs: Vec<_> = xs.into_iter().collect();
-            xs.sort_by(|(_, x), (_, y)| x.cmp(y));
+            xs.sort_by(|(_, x), (_, y)| y.cmp(x));
             xs
         })
     }
@@ -62,10 +60,10 @@ PredictInplace<Array2<F>, T> for EnsembleLearner<M>
 where
     M: PredictInplace<Array2<F>, T>,
     <T as AsTargets>::Elem: Copy + Eq + Hash,
-    T: AsMultiTargets + AsMultiTargetsMut<Elem = <T as AsTargets>::Elem>,
+    T: AsTargets + AsTargetsMut<Elem = <T as AsTargets>::Elem>,
 {
     fn predict_inplace(&self, x: &Array2<F>, y: &mut T) {
-        let mut y_array = y.as_multi_targets_mut();
+        let mut y_array = y.as_targets_mut();
         assert_eq!(
             x.nrows(),
             y_array.len(),
@@ -118,18 +116,17 @@ impl<P> EnsembleLearnerParams<P> {
     }
 }
 
-impl<D, T, P: Fit<Array2<D::Elem>, T::Owned, Error>>
-     Fit<ArrayBase<D, Ix2>, T, Error> for EnsembleLearnerParams<P>
+impl<D, T, P: Fit<Array2<D>, T::Owned, Error>>
+     Fit<Array2<D>, T, Error> for EnsembleLearnerParams<P>
 where
-    D: Data,
-    D::Elem: Clone,
+    D: Clone,
     T: FromTargetArrayOwned,
     T::Elem: Copy + Eq + Hash,
     T::Owned: AsTargets,
 {
     type Object = EnsembleLearner<P::Object>;
 
-    fn fit(&self, dataset: &DatasetBase<ArrayBase<D, Ix2>, T>) -> Result<Self::Object, Error> {
+    fn fit(&self, dataset: &DatasetBase<Array2<D>, T>) -> Result<Self::Object, Error> {
         assert!(
             self.model_params.is_some(),
             "Must define an underlying model for ensemble learner",
@@ -142,12 +139,10 @@ where
 
         let iter = dataset.bootstrap_samples(dataset_size, rng);
 
-        let mut i = 0;
         for train in iter {
-            println!("Fitting model {}, {}", i, dataset_size);
-            i += 1;
             let model = self.model_params.as_ref().unwrap().fit(&train).unwrap();
             models.push(model);
+
             if models.len() == self.ensemble_size {
                 break
             }

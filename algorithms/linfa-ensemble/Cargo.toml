@@ -2,8 +2,8 @@
 name = "linfa-ensemble"
 version = "0.5.0"
 edition = "2018"
-authors = ["James Knight <j.knight21@ucl.ac.uk>"]
-description = "A collection of simple ensemble learning algorithms"
+authors = ["James Knight <jamesknight@hadean.com>"]
+description = "A general method for creating ensemble classifiers"
 license = "MIT/Apache-2.0"
 
 repository = "https://github.com/rust-ml/linfa"
